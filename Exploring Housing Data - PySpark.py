@@ -70,3 +70,57 @@ fed_df = (
 # test that dfs loaded
 display((fed_df.count(), len(fed_df.columns))) # 4283 x 11
 display(fed_df.limit(10))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Write to Storage Container
+
+# COMMAND ----------
+
+storage_name = "housingdatastorage"
+container_name = "data-post-etl"
+sas_key = "2FNPZ9FWi4UZ5xJHcmd9J7bh4V2WUG0FIEgqjlZh0ykMy4DOV3s4raCri1HhEjjvD1jnkDx8Wlha+ASttpMp2g=="
+
+# Configure blob storage account access key globally
+spark.conf.set(f"fs.azure.account.key.{storage_name}.blob.core.windows.net", sas_key)
+
+output_blob_folder = f"wasbs://{container_name}@{storage_name}.blob.core.windows.net"
+
+outputs = {"sp500_quarterly_agg": quarterly_agg}
+
+for fn, df in outputs.items():
+    temp_folder = f"{output_blob_folder}/temp"
+    # write the dataframe as a single file to blob storage
+    try:
+        (
+            df.write.mode("overwrite")
+            .option("header", "true")
+            .format("com.databricks.spark.csv")
+            .save(temp_folder)
+        )
+
+        # Get the CSV file(s) that was just saved
+        output_files = [
+            x for x in dbutils.fs.ls(temp_folder) if x.name.startswith("part-")
+        ]
+
+        # Move the CSV file(s) from the sub-folder (wrangled_data_folder) to the root of the blob container
+        # While finalizing filename(s)
+        if len(output_files) == 1:
+            dbutils.fs.mv(
+                output_files[0].path, f"{output_blob_folder}/sp500_quarterly_agg.csv"
+            )
+        else:
+            for e, f in enumerate(output_files, 1):
+                dbutils.fs.mv(
+                    f.path, f"{output_blob_folder}/sp500_quarterly_agg_part{e:02d}.csv"
+                )
+
+        dbutils.fs.rm(temp_folder, True)
+        display(f"Successfully wrote {fn} to blob container {container_name}.")
+    except Exception as e:
+        display(
+            f"Operation for {fn} went wrong somewhere. It may still have worked, check {container_name}.\n"
+        )
+        print(e)
