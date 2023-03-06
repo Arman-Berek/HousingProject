@@ -1,4 +1,10 @@
 # Databricks notebook source
+# imports
+
+from pyspark.sql.functions import *
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## HPI Master
 
@@ -13,8 +19,8 @@ hpi_df = (
 )
 
 # test that dfs loaded
-# display((hpi_df.count(), len(hpi_df.columns))) # 121462 rows, 10 columns
-# display(hpi_df.limit(10))
+display((hpi_df.count(), len(hpi_df.columns))) # 121462 rows, 10 columns
+display(hpi_df.limit(10))
 
 # filter to quarterly only
 hpi_df_quarterly = hpi_df.filter(hpi_df.frequency == 'quarterly')
@@ -31,22 +37,23 @@ sp500_df = (
     spark.read.format("csv")
     .option("header", "true")
     .option("inferSchema", "true")
-    .load("file:/Workspace/Repos/GitHub/HousingProject/S&P500.csv")
+    .option("dateFormat", "MMM dd, yyyy")
+    .load("file:/Workspace/Repos/GitHub/HousingProject/S&P500_1975_Present.csv")
 )
 
+sp500_df = sp500_df.select([c if c == 'Time' else regexp_replace(c, ',', '').cast('float').alias(c) for c in sp500_df.columns])
+
 # test that dfs loaded
-display((sp500_df.count(), len(sp500_df.columns))) # 4784 x 6
+display((sp500_df.count(), len(sp500_df.columns))) # 12147 x 7
 display(sp500_df.limit(10))
 
 # COMMAND ----------
 
 # group by quarterly, average
-from pyspark.sql.functions import *
-
 quarterly_agg = (
     sp500_df.groupby(year("Time"), quarter("Time"))
     .agg(
-        count("*").alias("biz_days"), avg("Close"), max("High"), min("Low")
+        count("*").alias("biz_days"), avg('Open'), avg("Close"), max("High"), min("Low")
     )
     .sort([asc("year(Time)"), asc("quarter(Time)")])
 )

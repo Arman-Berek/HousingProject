@@ -35,7 +35,7 @@ treasury_interest_rates
 
 # COMMAND ----------
 
-# Clean Dataa
+# Clean Data
 treasury_interest_rates["record_date"] = pd.to_datetime(treasury_interest_rates["record_date"])
 
 # COMMAND ----------
@@ -44,4 +44,5 @@ treasury_interest_rates["record_date"] = pd.to_datetime(treasury_interest_rates[
 treasury_interest_rates.to_csv("fed_fund_rate.csv", index= False)
 
 # COMMAND ----------
+
 
