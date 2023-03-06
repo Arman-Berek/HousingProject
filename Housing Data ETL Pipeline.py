@@ -11,7 +11,7 @@ import datetime as dt
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## HPI Master
+# MAGIC ## HPI Master: Extract & Transform
 
 # COMMAND ----------
 
@@ -33,34 +33,15 @@ display(hpi_df.limit(10))
 # COMMAND ----------
 
 
-# filter to quarterly  and State/ City level
-hpi_quarterly_agg = hpi_df.where((hpi_df.frequency == 'quarterly') & ((hpi_df.level == 'State') | (hpi_df.level == 'MSA')))
-display(hpi_quarterly_agg)
+# filter to quarterly + State/City level
+hpi_quarterly_agg = hpi_df.where((hpi_df.frequency == 'quarterly') & (hpi_df.level != 'Puerto Rico'))
+display((hpi_quarterly_agg.count(), len(hpi_quarterly_agg.columns)))
 
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Change to bypass csv
-# MAGIC ```
-# MAGIC # Import csv from url
-# MAGIC url_hpi = "https://www.fhfa.gov/HPI_master.csv"
-# MAGIC df_hpi = pd.read_csv(url_hpi)
-# MAGIC df_hpi = df_hpi.rename(columns={'yr': 'year'})
-# MAGIC df_hpi = df_hpi.loc[((df.frequency == 'quarterly') & ((df_hpi.level == "State") | (df_hpi.level == 'MSA')))]
-# MAGIC 
-# MAGIC 
-# MAGIC # create dataframes as PySpark
-# MAGIC hpi_quarterly_agg = spark.createDataFrame(df_hpi)
-# MAGIC # test that dfs loaded
-# MAGIC display((hpi_quarterly_agg.count(), len(hpi_quarterly_agg.columns))) # 192 x 4
-# MAGIC display(hpi_quarterly_agg.tail(5))
-# MAGIC ```
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## S&P 500
+# MAGIC ## S&P 500: Extract & Transform
 
 # COMMAND ----------
 
@@ -95,92 +76,8 @@ display(sp500_quarterly_agg.tail(10))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC #### Change
-# MAGIC Able to pull in the SNP 500 bypassing the csv from NASDAQ
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ```
-# MAGIC def get_snp500_quarterly():
-# MAGIC     '''
-# MAGIC     Get S&P 500 Quarterly from NASDAQ API at close
-# MAGIC     https://data.nasdaq.com/data/MULTPL/SP500_REAL_PRICE_MONTH-sp-500-real-price-by-month
-# MAGIC     
-# MAGIC 
-# MAGIC     Returns
-# MAGIC     -------
-# MAGIC     df_sp_quarterly : pandas.DataFrame
-# MAGIC         dataframe .
-# MAGIC 
-# MAGIC     '''
-# MAGIC     # https://data.nasdaq.com/data/MULTPL/SP500_REAL_PRICE_MONTH-sp-500-real-price-by-month
-# MAGIC 
-# MAGIC     # NASDAQ python call
-# MAGIC     #quandl.get("MULTPL/SP500_REAL_PRICE_MONTH", authtoken="fJueoQJtK4zU-raf1asE")
-# MAGIC 
-# MAGIC     # CSV
-# MAGIC     # url = "https://data.nasdaq.com/api/v3/datasets/MULTPL/SP500_REAL_PRICE_MONTH.csv?api_key=fJueoQJtK4zU-raf1asE"
-# MAGIC 
-# MAGIC     dt_start = '1975-01-01'
-# MAGIC     api_key = "fJueoQJtK4zU-raf1asE"
-# MAGIC     url_base = "https://data.nasdaq.com/api/v3/datasets/MULTPL"
-# MAGIC     stock = "SP500_REAL_PRICE_MONTH"
-# MAGIC     
-# MAGIC     params = {
-# MAGIC         "api_key" : api_key
-# MAGIC         }
-# MAGIC     
-# MAGIC     # url
-# MAGIC     api_url = "{}/{}.csv".format(url_base, stock)
-# MAGIC     
-# MAGIC     # Get Request
-# MAGIC     response = requests.get(api_url, params=params)
-# MAGIC     print(response)
-# MAGIC     url = response.url
-# MAGIC     df = pd.read_csv(url)
-# MAGIC     
-# MAGIC     ## CLEAN
-# MAGIC     # convert to datetime
-# MAGIC     df['Date'] = pd.to_datetime(df['Date'])
-# MAGIC     
-# MAGIC     # filter df
-# MAGIC     df = df.loc[df['Date'] >= dt_start]
-# MAGIC     df = df.sort_values(['Date'], ascending=True)
-# MAGIC     
-# MAGIC     # add quarters
-# MAGIC     df['Period'] = df['Date'].dt.quarter
-# MAGIC     df['Year'] = df['Date'].dt.year
-# MAGIC     
-# MAGIC     # Group by quarters
-# MAGIC     df_sp_quarterly = df.loc[:, ['Period', 'Year', 'Value']].groupby(['Period', 'Year']).mean().reset_index()
-# MAGIC     df_sp_quarterly = df_sp_quarterly.sort_values(['Year', 'Period'], ascending=True).reset_index(drop=True)
-# MAGIC     
-# MAGIC     
-# MAGIC     df_sp_quarterly = df_sp_quarterly.rename(columns={'Value' : 'SNP500_Value'})
-# MAGIC     
-# MAGIC     return df_sp_quarterly
-# MAGIC 
-# MAGIC 
-# MAGIC df_snp_quarterly_pandas = get_snp500_quarterly()
-# MAGIC # create dataframes as PySpark
-# MAGIC sp500_quarterly_agg = spark.createDataFrame(df_snp_quarterly_pandas)
-# MAGIC # test that dfs loaded
-# MAGIC display((sp500_quarterly_agg.count(), len(sp500_quarterly_agg.columns))) # 192 x 4
-# MAGIC display(sp500_quarterly_agg.tail(5))
-# MAGIC ```
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Quaterly Fed Interest Rate (FRED St. Louis)
+# MAGIC ## Quarterly Federal Interest Rate (FRED St. Louis): Extract & Transform
 # MAGIC URL: https://fred.stlouisfed.org/series/FEDFUNDS#0
-
-# COMMAND ----------
-
-import requests
-import datetime as dt
-import pandas as pd
 
 # COMMAND ----------
 
@@ -281,17 +178,17 @@ display(fed_fund_pandas_df.describe())
 
 # COMMAND ----------
 
-# create dataframes as PySpark
+# convert pandas to PySpark
 fed_df2 = spark.createDataFrame(fed_fund_pandas_df)
-# test that dfs loaded
-display((fed_df2.count(), len(fed_df2.columns))) # 192 x 4
+# final test that df properly went through ET
+display((fed_df2.count(), len(fed_df2.columns))) # 192 x 3
 display(fed_df2.tail(5))
 
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Join Data Frames on Period and Year
+# MAGIC ## Join Data Frames on Period and Year
 
 # COMMAND ----------
 
@@ -308,7 +205,9 @@ display(joined_df.limit(10))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Write to Storage Container
+# MAGIC ## Load to Storage Container
+# MAGIC 
+# MAGIC Storage account key is exposed here. In actual production, we'd set up a specific key for the container with Azure Key Vault: https://learn.microsoft.com/en-us/azure/key-vault/secrets/overview-storage-keys
 
 # COMMAND ----------
 
@@ -356,7 +255,3 @@ for fn, df in outputs.items():
             f"Operation for {fn} went wrong somewhere. It may still have worked, check {container_name}.\n"
         )
         print(e)
-
-# COMMAND ----------
-
-
