@@ -21,7 +21,7 @@ hpi_df = (
     spark.read.format("csv")
     .option("header", "true")
     .option("inferSchema", "true")
-    .load("file:/Workspace/Repos/GitHub/HousingProject/HPI_master.csv")
+    .load("file:/Workspace/Repos/GitHub/HousingProject/data/HPI_master.csv")
     .withColumnRenamed('yr', 'year')
 )
 
@@ -50,7 +50,7 @@ sp500_df = (
     .option("header", "true")
     .option("inferSchema", "true")
     .option("dateFormat", "MMM dd, yyyy")
-    .load("file:/Workspace/Repos/GitHub/HousingProject/S&P500_1975_Present.csv")
+    .load("file:/Workspace/Repos/GitHub/HousingProject/data/S&P500_1975_Present.csv")
 )
 
 sp500_df = sp500_df.select([c if c == 'Time' else regexp_replace(c, ',', '').cast('float').alias(c) for c in sp500_df.columns])
