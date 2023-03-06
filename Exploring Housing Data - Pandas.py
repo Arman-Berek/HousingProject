@@ -1,8 +1,14 @@
 # Databricks notebook source
 # create dataframes as pandas
-import pandas as pd
-hpi_df = pd.read_csv("HPI_master.csv")
+#%%pyspark
+data_path = spark.read.load('abfss://housingdatastorage@data-post-etl.dfs.core.windows.net/joined_df.csv/', format='csv', header=True)
+data_path.show(10)
 
-# test that dfs loaded
-display(hpi_df.shape) # 121462 rows, 10 columns
-display(hpi_df.head(10))
+print('Converting to Pandas.')
+
+pdf = data_path.toPandas()
+print(pdf)
+
+# COMMAND ----------
+
+

@@ -3,6 +3,11 @@
 
 from pyspark.sql.functions import *
 
+# Python Packages
+import requests
+import pandas as pd
+import datetime as dt
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -10,21 +15,47 @@ from pyspark.sql.functions import *
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ```
+# MAGIC # create dataframes as PySpark
+# MAGIC hpi_df = (
+# MAGIC     spark.read.format("csv")
+# MAGIC     .option("header", "true")
+# MAGIC     .option("inferSchema", "true")
+# MAGIC     .load("file:/Workspace/Repos/GitHub/HousingProject/HPI_master.csv")
+# MAGIC     .withColumnRenamed('yr', 'year')
+# MAGIC )
+# MAGIC 
+# MAGIC # test that dfs loaded
+# MAGIC display((hpi_df.count(), len(hpi_df.columns))) # 121462 rows, 10 columns
+# MAGIC display(hpi_df.limit(10))
+# MAGIC ```
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ```
+# MAGIC # filter to quarterly  and State/ City level
+# MAGIC hpi_quarterly_agg = hpi_df.where((hpi_df.frequency == 'quarterly') & ((hpi_df.level == 'State') | (hpi_df.level == 'MSA')))
+# MAGIC display(hpi_quarterly_agg)
+# MAGIC ```
+
+# COMMAND ----------
+
+# Import csv from url
+url_hpi = "https://www.fhfa.gov/HPI_master.csv"
+df_hpi = pd.read_csv(url_hpi)
+df_hpi = df_hpi.rename(columns={'yr': 'year'})
+df_hpi = df_hpi.loc[((df.frequency == 'quarterly') & ((df_hpi.level == "State") | (df_hpi.level == 'MSA')))]
+
+
 # create dataframes as PySpark
-hpi_df = (
-    spark.read.format("csv")
-    .option("header", "true")
-    .option("inferSchema", "true")
-    .load("file:/Workspace/Repos/GitHub/HousingProject/HPI_master.csv")
-)
-
+hpi_quarterly_agg = spark.createDataFrame(df_hpi)
 # test that dfs loaded
-display((hpi_df.count(), len(hpi_df.columns))) # 121462 rows, 10 columns
-display(hpi_df.limit(10))
+display((hpi_quarterly_agg.count(), len(hpi_quarterly_agg.columns))) # 192 x 4
+display(hpi_quarterly_agg.tail(5))
 
-# filter to quarterly only
-hpi_df_quarterly = hpi_df.filter(hpi_df.frequency == 'quarterly')
-display((hpi_df_quarterly.count(), len(hpi_df_quarterly.columns))) # 117622, 10
+
 
 # COMMAND ----------
 
@@ -50,19 +81,24 @@ display(sp500_df.limit(10))
 # COMMAND ----------
 
 # group by quarterly, average
-quarterly_agg = (
+sp500_quarterly_agg = (
     sp500_df.groupby(year("Time"), quarter("Time"))
     .agg(
-        count("*").alias("biz_days"), avg('Open'), avg("Close"), max("High"), min("Low")
+       avg('Open'), avg("Close"), max("High"), min("Low")
     )
-    .sort([asc("year(Time)"), asc("quarter(Time)")])
+    .withColumnRenamed("year(Time)","Year").withColumnRenamed("quarter(Time)","Period")
+    .sort([asc("Year"), asc("Period")])
 )
-display(quarterly_agg)
+
+display(sp500_quarterly_agg.tail(10))
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Federal Interest Rate
+# MAGIC ## Federal Interest Rate - 
+# MAGIC #### From Treasury APi
+# MAGIC * Only goes back to 2001
+# MAGIC * No longer used
 
 # COMMAND ----------
 
@@ -80,6 +116,156 @@ display(fed_df.limit(10))
 
 # COMMAND ----------
 
+# group by quarterly, average
+fed_quarterly_agg = (
+    fed_df.groupby(year("record_date"), quarter("record_date"), "security_desc")
+    .agg(
+        avg('avg_interest_rate_amt').alias('avg_interest_rate')
+    )
+  .withColumnRenamed("year(record_date)","Year").withColumnRenamed("quarter(record_date)","Period")
+    .sort([asc("Year"), asc("Period")])
+    .sort([asc("Year"), asc("Period")])
+    .filter(col('security_desc') == 'Treasury Bills')
+)
+display(fed_quarterly_agg)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Quaterly Fed Interest Rate (FRED St. Louis)
+# MAGIC URL: https://fred.stlouisfed.org/series/FEDFUNDS#0
+
+# COMMAND ----------
+
+import requests
+import datetime as dt
+import pandas as pd
+
+# COMMAND ----------
+
+# Variables
+current_date = dt.date.today().strftime('%Y-%m-%d')
+frequency ="Quarterly"
+start_dt = "1975-01-01" # "1954-07-01"
+current_month_dt = dt.date.today().replace(day=1) # "2023-02-01"
+
+url_base = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Sample CSV URL 
+# MAGIC 
+# MAGIC https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=968&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=FEDFUNDS&scale=left&cosd=1954-07-01&coed=2023-02-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Quarterly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2023-03-06&revision_date=2023-03-06&nd=1954-07-01
+
+# COMMAND ----------
+
+# Call Parameters
+params = {
+    "bgcolor" : "#e1e9f0",
+    "chart_type" : "line",
+    "drp" : "0",
+    "fo" : "open sans",
+    "graph_bgcolor" : "#ffffff",
+    "height" : "450",
+    "mode":"fred",
+    "recession_bars":"on",
+    "txtcolor":"#444444",
+    "ts":"12",
+    "tts":"12",
+    "width":"968",
+    "nt":"0",
+    "thu":"0",
+    "trc":"0",
+    "show_legend":"yes",
+    "show_axis_titles":"yes",
+    "show_tooltip":"yes",
+    "id":"FEDFUNDS",
+    "scale" : "left",
+    "cosd" : "1975-01-01",
+    "coed" : current_month_dt, # "2023-02-01"
+    "line_color" : "#4572a7",
+    "link_values" : "false",
+    "line_style" : "solid",
+    "mark_type" :" none",
+    "mw" : "3",
+    "lw" : "2",
+    "ost" : "-99999",
+    "oet" : "99999",
+    "mma" : "0",
+    "fml" : "a",
+    "fq" :  frequency,
+    "fam" : "avg",
+    "fgst" : "lin",
+    "fgsnd" : "2020-02-01",
+    "line_index" : "1",
+    "transformation" : "lin",
+    "vintage_date" : current_date,
+    "revision_date" : current_date,
+    "nd" : start_dt
+    }
+
+
+# COMMAND ----------
+
+# Requst Call to get url
+response = requests.get(url_base, params=params)
+fed_fund_url = response.url
+print(response)
+
+# COMMAND ----------
+
+# Pandas read url to csv
+fed_fund_pandas_df= pd.read_csv(fed_fund_url)
+
+
+# Clean
+# drop rows with no data
+fed_fund_pandas_df = fed_fund_pandas_df.loc[~(fed_fund_pandas_df["FEDFUNDS"] == ".")]
+
+# Convert to date and year
+fed_fund_pandas_df["DATE"] = pd.to_datetime(fed_fund_pandas_df["DATE"])
+
+fed_fund_pandas_df["Period"] = fed_fund_pandas_df["DATE"].dt.quarter
+fed_fund_pandas_df["Year"] = fed_fund_pandas_df["DATE"].dt.year
+
+# drop date
+fed_fund_pandas_df = fed_fund_pandas_df.drop(columns= ["DATE"], errors='ignore')
+
+# Rename column
+fed_fund_pandas_df = fed_fund_pandas_df.rename(columns={"FEDFUNDS" : "fed_interest_rate"})
+
+display(fed_fund_pandas_df)
+display(fed_fund_pandas_df.describe())
+
+# COMMAND ----------
+
+# create dataframes as PySpark
+fed_df2 = spark.createDataFrame(fed_fund_pandas_df)
+# test that dfs loaded
+display((fed_df2.count(), len(fed_df2.columns))) # 192 x 4
+display(fed_df2.tail(5))
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Join Data Frames on Period and Year
+
+# COMMAND ----------
+
+joined_df = (
+    hpi_quarterly_agg
+    .join(sp500_quarterly_agg, on=['Year', 'Period'])
+    .join(fed_df2, on=['Year', 'Period'])
+)
+
+# test that join was successful
+display((joined_df.count(), len(joined_df.columns)))
+display(joined_df.limit(10))
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Write to Storage Container
 
@@ -94,14 +280,16 @@ spark.conf.set(f"fs.azure.account.key.{storage_name}.blob.core.windows.net", sas
 
 output_blob_folder = f"wasbs://{container_name}@{storage_name}.blob.core.windows.net"
 
-outputs = {"sp500_quarterly_agg": quarterly_agg}
+outputs = {"joined_df": joined_df}
 
 for fn, df in outputs.items():
     temp_folder = f"{output_blob_folder}/temp"
     # write the dataframe as a single file to blob storage
     try:
         (
-            df.write.mode("overwrite")
+            df
+            .coalesce(1)
+            .write.mode("overwrite")
             .option("header", "true")
             .format("com.databricks.spark.csv")
             .save(temp_folder)
@@ -115,14 +303,10 @@ for fn, df in outputs.items():
         # Move the CSV file(s) from the sub-folder (wrangled_data_folder) to the root of the blob container
         # While finalizing filename(s)
         if len(output_files) == 1:
-            dbutils.fs.mv(
-                output_files[0].path, f"{output_blob_folder}/sp500_quarterly_agg.csv"
-            )
+            dbutils.fs.mv(output_files[0].path, f"{output_blob_folder}/{fn}.csv")
         else:
             for e, f in enumerate(output_files, 1):
-                dbutils.fs.mv(
-                    f.path, f"{output_blob_folder}/sp500_quarterly_agg_part{e:02d}.csv"
-                )
+                dbutils.fs.mv(f.path, f"{output_blob_folder}/{fn}_part{e:02d}.csv")
 
         dbutils.fs.rm(temp_folder, True)
         display(f"Successfully wrote {fn} to blob container {container_name}.")
@@ -131,3 +315,7 @@ for fn, df in outputs.items():
             f"Operation for {fn} went wrong somewhere. It may still have worked, check {container_name}.\n"
         )
         print(e)
+
+# COMMAND ----------
+
+
