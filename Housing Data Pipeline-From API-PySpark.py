@@ -21,20 +21,7 @@ import datetime as dt
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ```
-# MAGIC # create dataframes as PySpark
-# MAGIC hpi_df = (
-# MAGIC     spark.read.format("csv")
-# MAGIC     .option("header", "true")
-# MAGIC     .option("inferSchema", "true")
-# MAGIC     .load("file:/Workspace/Repos/GitHub/HousingProject/HPI_master.csv")
-# MAGIC     .withColumnRenamed('yr', 'year')
-# MAGIC )
-# MAGIC 
-# MAGIC # test that dfs loaded
-# MAGIC display((hpi_df.count(), len(hpi_df.columns))) # 121462 rows, 10 columns
-# MAGIC display(hpi_df.limit(10))
-# MAGIC ```
+
 
 # COMMAND ----------
 
@@ -57,7 +44,7 @@ import datetime as dt
 url_hpi = "https://www.fhfa.gov/HPI_master.csv"
 df_hpi = pd.read_csv(url_hpi)
 df_hpi = df_hpi.rename(columns={'yr': 'year'})
-df_hpi = df_hpi.loc[((df_hpi.frequency == 'quarterly') & ((df_hpi.level == "State") | (df_hpi.level == 'MSA')))]
+df_hpi = df_hpi.loc[((df_hpi.frequency == 'quarterly') & (df_hpi.level != "Puerto Rico"))]
 
 
 # create dataframes as PySpark
@@ -337,7 +324,7 @@ spark.conf.set(f"fs.azure.account.key.{storage_name}.blob.core.windows.net", sas
 
 output_blob_folder = f"wasbs://{container_name}@{storage_name}.blob.core.windows.net"
 
-outputs = {"joined_df": joined_df}
+outputs = {"housing_data_joined_df": joined_df}
 
 for fn, df in outputs.items():
     temp_folder = f"{output_blob_folder}/temp"
