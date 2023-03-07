@@ -47,3 +47,16 @@ dfImportSpark = spark.read.format("csv").load(filePath, inferSchema = True, head
 display(dfImportSpark)
 df_import = dfImportSpark.toPandas()
 display(df_import.tail(5))
+
+# COMMAND ----------
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+matrix = df_import.corr().round(2)
+sns.heatmap(matrix, annot=True)
+plt.show()
+
+# COMMAND ----------
+
+
