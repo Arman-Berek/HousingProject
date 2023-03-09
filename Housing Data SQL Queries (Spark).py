@@ -135,6 +135,18 @@ SELECT yr, period, place_name, index_sa
 FROM housing
 WHERE period = '4' AND level = 'State' AND (yr = '2008' OR yr = '2010') AND hpi_flavor = 'purchase-only' AND index_sa IS NOT NULL
 GROUP BY place_name, yr, period, index_sa
+ORDER BY index_sa;
+""") 
+display(query)
+
+# COMMAND ----------
+
+# Showing period 4 index_sa per state for 2008 and 2010. 
+query = spark.sql("""
+SELECT yr, period, place_name, index_sa
+FROM housing
+WHERE period = '4' AND level = 'State' AND (yr = '2008' OR yr = '2010') AND hpi_flavor = 'purchase-only' AND index_sa IS NOT NULL
+GROUP BY place_name, yr, period, index_sa
 ORDER BY index_sa, yr;
 """) 
 display(query)
